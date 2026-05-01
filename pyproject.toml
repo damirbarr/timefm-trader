@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "timefm-trader"
+version = "0.1.0"
+description = "Multi-coin crypto trading bot powered by Google TimeFM"
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=src/timefm_trader --cov-report=term-missing -v"
+
+[tool.coverage.run]
+source = ["src/timefm_trader"]
