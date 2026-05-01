@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TimeFM Trader</title>
+  <script src="https://unpkg.com/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --card: #1a1a1a;
+      --border: #262626;
+      --text: #e0e0e0;
+      --muted: #909090;
+      --green: #00ff88;
+      --red: #ff4466;
+      --accent: #4488ff;
+      --orange: #ff9f40;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .app {
+      display: grid;
+      gap: 16px;
+      padding: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: 1.5fr repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      align-items: center;
+    }
+
+    .title-block h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      letter-spacing: 0.14em;
+    }
+
+    .title-block p,
+    .metric-label,
+    .empty,
+    .insight-expiry {
+      color: var(--muted);
+    }
+
+    .metric {
+      min-width: 0;
+    }
+
+    .metric-label {
+      display: block;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 1.1rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      width: fit-content;
+    }
+
+    .badge.paper {
+      background: rgba(68, 136, 255, 0.15);
+      color: var(--accent);
+    }
+
+    .badge.live {
+      background: rgba(255, 68, 102, 0.15);
+      color: var(--red);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: auto minmax(220px, 360px);
+      gap: 12px;
+      align-items: center;
+    }
+
+    button,
+    input {
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #121212;
+      color: var(--text);
+      padding: 10px 12px;
+      font-size: 0.95rem;
+    }
+
+    button {
+      cursor: pointer;
+      background: var(--accent);
+      border-color: transparent;
+      font-weight: 700;
+    }
+
+    button.secondary {
+      background: #2b2b2b;
+    }
+
+    input {
+      width: 100%;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 7fr) minmax(300px, 3fr);
+      gap: 16px;
+    }
+
+    .positions-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .positions-table th,
+    .positions-table td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      font-size: 0.92rem;
+    }
+
+    .positions-table tbody tr {
+      cursor: pointer;
+      transition: background 0.18s ease;
+    }
+
+    .positions-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .positive { color: var(--green); }
+    .negative { color: var(--red); }
+
+    .insights-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .insight-item {
+      display: grid;
+      gap: 6px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #141414;
+      border: 1px solid var(--border);
+    }
+
+    .insight-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(0, 0, 0, 0.72);
+      padding: 20px;
+      z-index: 1000;
+    }
+
+    .modal.open { display: grid; }
+
+    .modal-content {
+      width: min(1200px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      background: #111111;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #coinChart,
+    #rsiChart,
+    #macdChart,
+    #volumeChart {
+      width: 100%;
+      height: 220px;
+      background: #0d0d0d;
+      border-radius: 10px;
+    }
+
+    #coinChart { height: 360px; }
+
+    .sub-panels {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .panel-title {
+      margin: 0 0 8px;
+      font-size: 0.88rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    @media (max-width: 980px) {
+      .header,
+      .controls,
+      .main-grid,
+      .sub-panels {
+        grid-template-columns: 1fr;
+      }
+
+      .positions-table {
+        display: block;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="card header">
+      <div class="title-block">
+        <h1>TIMEFM TRADER</h1>
+        <p id="statusText">Waiting for live state</p>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Mode</span>
+        <span id="modeBadge" class="badge paper">PAPER</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Portfolio Value</span>
+        <span id="portfolioValue" class="metric-value">$0.00</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Return %</span>
+        <span id="returnPct" class="metric-value">0.00%</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Fees Paid</span>
+        <span id="feesPaid" class="metric-value">$0.00</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Position Count</span>
+        <span id="positionCount" class="metric-value">0</span>
+      </div>
+    </section>
+
+    <section class="card controls">
+      <button id="pauseToggle">Pause</button>
+      <input id="tokenInput" type="password" placeholder="Control API token">
+    </section>
+
+    <section class="main-grid">
+      <div class="card">
+        <table class="positions-table">
+          <thead>
+            <tr>
+              <th>COIN</th>
+              <th>ENTRY</th>
+              <th>NOW</th>
+              <th>FORECAST</th>
+              <th>CONF</th>
+              <th>TIMEFRAME</th>
+              <th>P&amp;L%</th>
+              <th>ACTION</th>
+            </tr>
+          </thead>
+          <tbody id="positionsBody">
+            <tr><td colspan="8" class="empty">No active positions</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <p class="panel-title">Portfolio Equity</p>
+        <canvas id="equityChart" height="320"></canvas>
+      </div>
+    </section>
+
+    <section class="card">
+      <p class="panel-title">Active Insights</p>
+      <div id="insightsList" class="insights-list">
+        <div class="empty">No active insights</div>
+      </div>
+    </section>
+  </div>
+
+  <div id="chartModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 id="modalTitle" style="margin:0;">Coin Detail</h2>
+          <p id="modalSubtitle" class="empty" style="margin:4px 0 0;">Waiting for chart data</p>
+        </div>
+        <button id="closeModal" class="secondary">Close</button>
+      </div>
+      <div id="coinChart"></div>
+      <div class="sub-panels">
+        <div>
+          <p class="panel-title">RSI</p>
+          <canvas id="rsiChart" height="180"></canvas>
+        </div>
+        <div>
+          <p class="panel-title">MACD</p>
+          <canvas id="macdChart" height="180"></canvas>
+        </div>
+        <div>
+          <p class="panel-title">Volume</p>
+          <canvas id="volumeChart" height="180"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const tokenInput = document.getElementById('tokenInput');
+    tokenInput.value = localStorage.getItem('trader_token') || '';
+
+    let token = tokenInput.value;
+    let latestState = {};
+    let selectedSymbol = null;
+    let chartApi = null;
+    let candleSeries = null;
+    let ma20Series = null;
+    let ma50Series = null;
+    let ma200Series = null;
+    let forecastSeries = null;
+    let forecastLowerSeries = null;
+    let forecastUpperSeries = null;
+    let equityChart = null;
+    let rsiChart = null;
+    let macdChart = null;
+    let volumeChart = null;
+
+    const chartModal = document.getElementById('chartModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalSubtitle = document.getElementById('modalSubtitle');
+
+    const wsScheme = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${wsScheme}://${location.host}/ws`);
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      latestState = data || {};
+      updateHeader(latestState);
+      updatePositionsTable(latestState.positions || {});
+      updateInsights(latestState.active_insights || []);
+      updateEquityChart(latestState.portfolio_value, latestState.balance_history);
+      if (selectedSymbol) {
+        const pos = (latestState.positions || {})[selectedSymbol];
+        if (pos) renderCoinModal(selectedSymbol, pos);
+      }
+    };
+
+    function money(value) {
+      const num = Number(value || 0);
+      return `$${num.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    }
+
+    function pct(value) {
+      const num = Number(value || 0) * 100;
+      return `${num.toFixed(2)}%`;
+    }
+
+    function classForSigned(value) {
+      return Number(value || 0) >= 0 ? 'positive' : 'negative';
+    }
+
+    function updateHeader(data) {
+      const mode = String(data.mode || 'paper').toUpperCase();
+      const running = data.running !== false;
+      const paused = data.paused === true;
+      const returnPct = Number(data.total_return_pct || 0);
+      const positions = data.positions || {};
+
+      const badge = document.getElementById('modeBadge');
+      badge.textContent = mode;
+      badge.className = `badge ${mode === 'LIVE' || mode === 'REAL' ? 'live' : 'paper'}`;
+
+      document.getElementById('statusText').textContent =
+        paused ? 'Trading paused' : (running ? 'Trading active' : 'Bot stopped');
+      document.getElementById('portfolioValue').textContent = money(data.portfolio_value || data.balance_usd || 0);
+
+      const returnNode = document.getElementById('returnPct');
+      returnNode.textContent = pct(returnPct);
+      returnNode.className = `metric-value ${classForSigned(returnPct)}`;
+
+      document.getElementById('feesPaid').textContent = money(data.total_fees_paid || 0);
+      document.getElementById('positionCount').textContent = String(
+        data.position_count ?? Object.keys(positions).length
+      );
+
+      const pauseButton = document.getElementById('pauseToggle');
+      pauseButton.textContent = paused ? 'Resume' : 'Pause';
+    }
+
+    function updatePositionsTable(positions) {
+      const body = document.getElementById('positionsBody');
+      const entries = Object.entries(positions || {});
+      if (!entries.length) {
+        body.innerHTML = '<tr><td colspan="8" class="empty">No active positions</td></tr>';
+        return;
+      }
+
+      body.innerHTML = '';
+      for (const [symbol, position] of entries) {
+        const row = document.createElement('tr');
+        const forecastPrices = position.forecast?.forecast_prices || position.forecast_prices || [];
+        const forecastValue = forecastPrices.length ? forecastPrices[forecastPrices.length - 1] : null;
+        const confidence =
+          position.forecast?.confidence_score ?? position.confidence ?? position.forecast_confidence ?? null;
+        const timeframe = position.forecast?.timeframe || position.timeframe || '--';
+        const pnl = position.unrealized_pnl_pct ?? 0;
+
+        row.innerHTML = `
+          <td>${symbol}</td>
+          <td>${Number(position.entry_price || 0).toFixed(4)}</td>
+          <td>${Number(position.current_price || 0).toFixed(4)}</td>
+          <td>${forecastValue == null ? '--' : Number(forecastValue).toFixed(4)}</td>
+          <td>${confidence == null ? '--' : (Number(confidence) * 100).toFixed(1) + '%'}</td>
+          <td>${timeframe}</td>
+          <td class="${classForSigned(pnl)}">${pct(pnl)}</td>
+          <td><button class="secondary sell-btn" data-symbol="${symbol}">Sell</button></td>
+        `;
+
+        row.addEventListener('click', () => openModal(symbol, position));
+        body.appendChild(row);
+      }
+
+      body.querySelectorAll('.sell-btn').forEach((button) => {
+        button.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          const symbol = event.currentTarget.dataset.symbol;
+          await postControl('/control/position', {action: 'force_sell', coin: symbol});
+        });
+      });
+    }
+
+    function updateInsights(insights) {
+      const container = document.getElementById('insightsList');
+      if (!insights.length) {
+        container.innerHTML = '<div class="empty">No active insights</div>';
+        return;
+      }
+
+      container.innerHTML = '';
+      insights.forEach((insight) => {
+        const item = document.createElement('div');
+        item.className = 'insight-item';
+        item.innerHTML = `
+          <div class="insight-header">
+            <strong>${insight.coin || 'ALL'} · ${String(insight.direction || 'neutral').toUpperCase()}</strong>
+            <span class="insight-expiry">expires in ${insight.ttl_minutes || '?'}m</span>
+          </div>
+          <div>Strength ${(Number(insight.strength || 0) * 100).toFixed(1)}%</div>
+          <div>${insight.reason || ''}</div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function ensureEquityChart() {
+      if (equityChart) return equityChart;
+      const ctx = document.getElementById('equityChart');
+      equityChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [{ data: [], borderColor: '#00ff88', tension: 0.2, pointRadius: 0 }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#909090' }, grid: { color: '#222' } },
+            y: { ticks: { color: '#909090' }, grid: { color: '#222' } }
+          }
+        }
+      });
+      return equityChart;
+    }
+
+    function updateEquityChart(portfolioValue, balanceHistory) {
+      const chart = ensureEquityChart();
+      const history = Array.isArray(balanceHistory) && balanceHistory.length
+        ? balanceHistory
+        : [{time: new Date().toISOString(), value: portfolioValue || 0}];
+
+      chart.data.labels = history.map((point, index) => point.time || point.timestamp || `T${index + 1}`);
+      chart.data.datasets[0].data = history.map((point) => point.value ?? point.portfolio_value ?? portfolioValue ?? 0);
+      chart.update();
+    }
+
+    async function postControl(endpoint, body) {
+      token = tokenInput.value.trim();
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify(body)
+      });
+      if (!response.ok) {
+        console.error('Control request failed', endpoint, await response.text());
+      }
+      return response;
+    }
+
+    function average(values, windowSize) {
+      return values.map((_, index) => {
+        if (index + 1 < windowSize) return null;
+        const slice = values.slice(index + 1 - windowSize, index + 1);
+        const sum = slice.reduce((acc, value) => acc + value, 0);
+        return sum / windowSize;
+      });
+    }
+
+    function computeRsi(closes, period = 14) {
+      const result = closes.map(() => null);
+      for (let index = period; index < closes.length; index += 1) {
+        let gains = 0;
+        let losses = 0;
+        for (let inner = index - period + 1; inner <= index; inner += 1) {
+          const diff = closes[inner] - closes[inner - 1];
+          if (diff >= 0) gains += diff;
+          else losses -= diff;
+        }
+        const rs = losses === 0 ? 100 : gains / losses;
+        result[index] = 100 - (100 / (1 + rs));
+      }
+      return result;
+    }
+
+    function computeMacd(closes) {
+      const ema = (period) => {
+        const multiplier = 2 / (period + 1);
+        const output = [];
+        closes.forEach((price, index) => {
+          if (index === 0) output.push(price);
+          else output.push((price - output[index - 1]) * multiplier + output[index - 1]);
+        });
+        return output;
+      };
+
+      const ema12 = ema(12);
+      const ema26 = ema(26);
+      const macd = ema12.map((value, index) => value - ema26[index]);
+      const signal = [];
+      const multiplier = 2 / (9 + 1);
+      macd.forEach((value, index) => {
+        if (index === 0) signal.push(value);
+        else signal.push((value - signal[index - 1]) * multiplier + signal[index - 1]);
+      });
+      return macd.map((value, index) => value - signal[index]);
+    }
+
+    function initCoinChart() {
+      if (chartApi) return;
+      chartApi = LightweightCharts.createChart(document.getElementById('coinChart'), {
+        layout: { background: { color: '#0d0d0d' }, textColor: '#d0d0d0' },
+        grid: { vertLines: { color: '#1f1f1f' }, horzLines: { color: '#1f1f1f' } },
+        width: document.getElementById('coinChart').clientWidth,
+        height: 360
+      });
+      candleSeries = chartApi.addCandlestickSeries({
+        upColor: '#00ff88',
+        downColor: '#ff4466',
+        borderVisible: false,
+        wickUpColor: '#00ff88',
+        wickDownColor: '#ff4466'
+      });
+      ma20Series = chartApi.addLineSeries({ color: '#4488ff', lineWidth: 2 });
+      ma50Series = chartApi.addLineSeries({ color: '#ff9f40', lineWidth: 2 });
+      ma200Series = chartApi.addLineSeries({ color: '#ff4466', lineWidth: 2 });
+      forecastSeries = chartApi.addLineSeries({ color: '#ffffff', lineWidth: 2, lineStyle: 2 });
+      forecastLowerSeries = chartApi.addAreaSeries({
+        lineColor: 'rgba(68, 136, 255, 0.2)',
+        topColor: 'rgba(68, 136, 255, 0.25)',
+        bottomColor: 'rgba(68, 136, 255, 0.02)'
+      });
+      forecastUpperSeries = chartApi.addAreaSeries({
+        lineColor: 'rgba(68, 136, 255, 0.2)',
+        topColor: 'rgba(68, 136, 255, 0.02)',
+        bottomColor: 'rgba(68, 136, 255, 0.25)'
+      });
+
+      window.addEventListener('resize', () => {
+        if (chartApi) {
+          chartApi.applyOptions({ width: document.getElementById('coinChart').clientWidth });
+        }
+      });
+    }
+
+    function ensureMiniChart(canvasId, type, datasetOptions) {
+      const target = Chart.getChart(canvasId);
+      if (target) return target;
+      return new Chart(document.getElementById(canvasId), {
+        type,
+        data: { labels: [], datasets: [{ data: [], ...datasetOptions }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#909090' }, grid: { color: '#222' } },
+            y: { ticks: { color: '#909090' }, grid: { color: '#222' } }
+          }
+        }
+      });
+    }
+
+    function openModal(symbol, position) {
+      selectedSymbol = symbol;
+      chartModal.classList.add('open');
+      renderCoinModal(symbol, position);
+    }
+
+    function renderCoinModal(symbol, position) {
+      initCoinChart();
+      modalTitle.textContent = symbol;
+      modalSubtitle.textContent = `Entry ${Number(position.entry_price || 0).toFixed(4)} · Now ${Number(position.current_price || 0).toFixed(4)}`;
+
+      const rawCandles = position.ohlcv_cache || position.candles || [];
+      const candles = rawCandles.map((item, index) => ({
+        time: Math.floor(new Date(item.time || item.timestamp || Date.now() + index * 60000).getTime() / 1000),
+        open: Number(item.open ?? item[1] ?? 0),
+        high: Number(item.high ?? item[2] ?? 0),
+        low: Number(item.low ?? item[3] ?? 0),
+        close: Number(item.close ?? item[4] ?? 0),
+        volume: Number(item.volume ?? item[5] ?? 0)
+      })).filter((item) => item.open || item.high || item.low || item.close);
+
+      candleSeries.setData(candles);
+      const closes = candles.map((candle) => candle.close);
+      const ma20 = average(closes, 20);
+      const ma50 = average(closes, 50);
+      const ma200 = average(closes, 200);
+      ma20Series.setData(candles.map((candle, index) => ({ time: candle.time, value: ma20[index] })).filter((point) => point.value != null));
+      ma50Series.setData(candles.map((candle, index) => ({ time: candle.time, value: ma50[index] })).filter((point) => point.value != null));
+      ma200Series.setData(candles.map((candle, index) => ({ time: candle.time, value: ma200[index] })).filter((point) => point.value != null));
+
+      const forecast = position.forecast || {};
+      const forecastPrices = forecast.forecast_prices || position.forecast_prices || [];
+      const lower = forecast.lower_bound || position.lower_bound || [];
+      const upper = forecast.upper_bound || position.upper_bound || [];
+      const timeframeMs = 60 * 1000;
+      const lastTime = candles.length ? candles[candles.length - 1].time : Math.floor(Date.now() / 1000);
+      const forecastData = forecastPrices.map((value, index) => ({
+        time: lastTime + ((index + 1) * timeframeMs) / 1000,
+        value: Number(value)
+      }));
+      forecastSeries.setData(forecastData);
+      forecastLowerSeries.setData(lower.map((value, index) => ({
+        time: lastTime + ((index + 1) * timeframeMs) / 1000,
+        value: Number(value)
+      })));
+      forecastUpperSeries.setData(upper.map((value, index) => ({
+        time: lastTime + ((index + 1) * timeframeMs) / 1000,
+        value: Number(value)
+      })));
+
+      chartApi.timeScale().fitContent();
+
+      const labels = candles.map((candle) => new Date(candle.time * 1000).toLocaleTimeString());
+      const rsiValues = computeRsi(closes);
+      const macdValues = computeMacd(closes);
+      const volumeValues = candles.map((candle) => candle.volume);
+
+      rsiChart = ensureMiniChart('rsiChart', 'line', { borderColor: '#4488ff', tension: 0.2, pointRadius: 0 });
+      macdChart = ensureMiniChart('macdChart', 'bar', {
+        backgroundColor: macdValues.map((value) => value >= 0 ? '#00ff88' : '#ff4466')
+      });
+      volumeChart = ensureMiniChart('volumeChart', 'bar', {
+        backgroundColor: candles.map((candle) => candle.close >= candle.open ? '#00ff88' : '#ff4466')
+      });
+
+      rsiChart.data.labels = labels;
+      rsiChart.data.datasets[0].data = rsiValues;
+      rsiChart.update();
+
+      macdChart.data.labels = labels;
+      macdChart.data.datasets[0].data = macdValues;
+      macdChart.data.datasets[0].backgroundColor = macdValues.map((value) => value >= 0 ? '#00ff88' : '#ff4466');
+      macdChart.update();
+
+      volumeChart.data.labels = labels;
+      volumeChart.data.datasets[0].data = volumeValues;
+      volumeChart.data.datasets[0].backgroundColor = candles.map((candle) => candle.close >= candle.open ? '#00ff88' : '#ff4466');
+      volumeChart.update();
+    }
+
+    document.getElementById('pauseToggle').addEventListener('click', async () => {
+      const paused = latestState.paused === true;
+      await postControl('/control/trading', {action: paused ? 'resume' : 'pause'});
+    });
+
+    tokenInput.addEventListener('change', () => {
+      token = tokenInput.value.trim();
+      localStorage.setItem('trader_token', token);
+    });
+
+    document.getElementById('closeModal').addEventListener('click', () => {
+      chartModal.classList.remove('open');
+      selectedSymbol = null;
+    });
+
+    chartModal.addEventListener('click', (event) => {
+      if (event.target === chartModal) {
+        chartModal.classList.remove('open');
+        selectedSymbol = null;
+      }
+    });
+  </script>
+</body>
+</html>
