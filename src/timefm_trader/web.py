@@ -174,7 +174,7 @@ if os.path.exists(static_dir):
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 
-@app.get("/")
+@app.get("/", response_model=None)
 async def root() -> FileResponse | dict[str, str]:
     index = os.path.join(static_dir, "index.html")
     if os.path.exists(index):

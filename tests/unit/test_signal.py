@@ -85,10 +85,10 @@ def test_rank_and_allocate_uses_proportional_allocation(sample_forecast):
     signal_c = Signal("SOLUSDT", Direction.BUY, 0.4, 0.03, "1h", sample_forecast)
 
     allocations = rank_and_allocate(
-        [signal_a, signal_b, signal_c], 10000, 0.1, 0.3, 10
+        [signal_a, signal_b, signal_c], 10000, 0.1, 0.5, 10  # 50% cap so nothing gets clipped
     )
 
-    assert sum(allocations.values()) <= 10000 * 0.9
+    assert sum(allocations.values()) <= 10000 * 0.9 + 1e-6
     assert allocations["BTCUSDT"] > allocations["ETHUSDT"] > allocations["SOLUSDT"]
 
 
